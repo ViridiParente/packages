@@ -8,12 +8,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=libgpiod
-PKG_VERSION:=2.1.3
-PKG_RELEASE:=2
+PKG_VERSION:=2.3
+PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=@KERNEL/software/libs/libgpiod/
-PKG_HASH:=2be4c0b03e995d236c0e476e14aeb475d7b431dd1439609b6d65c540f91eaf58
+PKG_HASH:=cb71db463aec2604ac520c95bf04eff1839d86bdc9a2dfd67ef879fbb10426ea
 
 PKG_MAINTAINER:=Michael Heimpold <mhei@heimpold.de>
 PKG_LICENSE:=LGPL-2.1-or-later
@@ -26,20 +26,30 @@ PYTHON3_PKG_BUILD:=0
 PKG_BUILD_DEPENDS:=PACKAGE_python3-gpiod:python-setuptools/host
 
 include $(INCLUDE_DIR)/package.mk
+include $(INCLUDE_DIR)/meson.mk
 include ../../lang/python/python3-package.mk
 
+MESON_ARGS += \
+	      -Dtests=disabled \
+	      -Dbindings-glib=disabled \
+	      -Ddbus=disabled \
+	      -Dintrospection=disabled \
+	      -Dsystemd=disabled
+
 ifneq ($(CONFIG_PACKAGE_libgpiodcxx),)
-CONFIGURE_ARGS += --enable-bindings-cxx
+MESON_ARGS += -Dbindings-cxx=enabled
 else
-CONFIGURE_ARGS += --disable-bindings-cxx
+MESON_ARGS += -Dbindings-cxx=disabled
 endif
 
 ifneq ($(CONFIG_PACKAGE_gpiod-tools),)
-CONFIGURE_ARGS += --enable-tools
+MESON_ARGS += -Dtools=enabled
+else
+MESON_ARGS += -Dtools=disabled
 endif
 
 PYTHON3_PKG_WHEEL_NAME:=gpiod
-PYTHON3_PKG_WHEEL_VERSION:=2.0.1
+PYTHON3_PKG_WHEEL_VERSION:=2.4.0
 
 PYTHON3_PKG_SETUP_DIR:=bindings/python
 PYTHON3_PKG_SETUP_VARS += LINK_SYSTEM_LIBGPIOD=1
@@ -100,21 +110,25 @@ define Package/python3-gpiod/description
 endef
 
 define Build/Configure
-	$(call Build/Configure/Default)
+	$(call Build/Configure/Meson)
     ifneq ($(CONFIG_PACKAGE_python3-gpiod),)
 	$(call Py3Build/Configure)
     endif
 endef
 
 define Build/Compile
-	$(call Build/Compile/Default)
+	$(call Build/Compile/Meson)
+
+	$(INSTALL_DIR) $(STAGING_DIR)/usr/lib
+	$(CP) $(MESON_BUILD_DIR)/lib/libgpiod.so* $(STAGING_DIR)/usr/lib
+
     ifneq ($(CONFIG_PACKAGE_python3-gpiod),)
 	$(call Py3Build/Compile)
     endif
 endef
 
 define Build/Install
-	$(call Build/Install/Default)
+	$(call Build/Install/Meson)
     ifneq ($(CONFIG_PACKAGE_python3-gpiod),)
 	$(call Py3Build/Install/Default)
     endif
@@ -156,6 +170,9 @@ define Package/libgpiodcxx/install
 endef
 
 define Package/gpiod-tools/install
+	$(INSTALL_DIR) $(1)/usr/lib
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libgpiotools.so.* $(1)/usr/lib/
+
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(CP) $(PKG_INSTALL_DIR)/usr/bin/* $(1)/usr/bin/
 endef
