@@ -1,0 +1,16 @@
+--- a/src/paho/mqtt/client.py
++++ b/src/paho/mqtt/client.py
+@@ -1704,7 +1704,12 @@
+             if rc or self._sock is None:
+                 return rc
+ 
+-        return self.loop_misc()
++        rc = self.loop_misc()
++        if rc == MQTT_ERR_SUCCESS:
++            # Make the main loop to update infight packets
++            with self._out_message_mutex:
++                return self._update_inflight()
++        return rc
+ 
+     def publish(
+         self,
